@@ -1,0 +1,385 @@
+ZAIRE zaire– Sistema de salud con diagnostico asistido con ia
+PRESENTADO POR:
+Andrea Robles hernadez
+ITZEL GALVAN CONTRERAS
+JUAN PABLO GONZALES ARAUS
+JERONIMO ISRAEL MACIAS QUINTERO
+Contenido
+Propósito del Proyecto4
+Objetivos del Proyecto4
+Objetivo General4
+Objetivos Específicos4
+Justificación4
+Alcance del Proyecto5
+Tecnologías a Utilizar5
+Arquitectura de Software6
+Componentes6
+El Agente de Diagnóstico por IA7
+Módulos necesarios7
+Módulo de Seguridad (JWT)7
+Módulo de Gestión de Pacientes7
+Módulo de Historial Clínico7
+Especificación de la API8
+Endpoints Principales8
+Principales Interesados (Stakeholders)8
+Infraestructura9
+Diagrama de Arquitectura9
+Metodología de Trabajo9
+Equipo de Trabajo10
+Organigrama Mixto10
+Cronograma Desarrollo Scrum10
+Requerimientos11
+Requerimientos Funcionales11
+Requerimientos No Funcionales13
+Diagramas14
+Casos de Uso14
+Diagrama de Componentes14
+Diagrama de Entidad Relación15
+Diagrama de Procesos16
+Diagrama de Secuencia17
+Diagrama de Despliegue17
+Diagrama de Actividades18
+Estrategia de Conexión y Despliegue19
+Conexión en Desarrollo (Local):19
+Despliegue (Producción):19
+Infraestructura y Despliegue (Costo Mínimo/Gratis)19
+Desglose de Tecnologías para el Despliegue20
+Conclusión21
+Referencias21
+Propósito del Proyecto
+Desarrollar un sistema de salud digital basado en una arquitectura cliente–servidor desacoplada, que permita la gestión de pacientes, el manejo de historial clínico digital y un módulo de apoyo al diagnóstico médico mediante inteligencia artificial, optimizando la atención médica mediante un desarrollo iterativo basado en la metodología Scrum.
+Objetivos del Proyecto
+Objetivo General
+Desarrollar una plataforma digital de salud que integre tecnologías de inteligencia artificial para apoyar el diagnóstico médico, facilitando el acceso a servicios de salud, mejorando la eficiencia en la atención clínica y apoyando la toma de decisiones médicas, siguiendo buenas prácticas de desarrollo de software y la metodología Scrum.
+Objetivos Específicos
+Implementar un módulo de registro, actualización y seguimiento de pacientes.
+Desarrollar un sistema de historial clínico digital con generación de reportes.
+Integrar un módulo de análisis preliminar de síntomas basado en IA como apoyo diagnóstico.
+Diseñar una arquitectura de software desacoplada, escalable y segura.
+Garantizar la usabilidad mediante interfaces móviles intuitivas.
+Aplicar Scrum para organizar el trabajo en sprints con entregables funcionales.
+Documentar técnica y funcionalmente el sistema desarrollado.
+Permitir la movilidad clínica mediante una aplicación móvil distribuida vía APK.
+Justificación
+La digitalización de los servicios de salud es una necesidad creciente debido al aumento en la demanda de atención médica y la optimización de recursos clínicos. Este proyecto aporta valor al:
+Reducir tiempos de registro y consulta de información clínica.
+Facilitar el acceso organizado y seguro a historiales médicos digitales.
+Proporcionar un apoyo preliminar al diagnóstico, sin sustituir al profesional de la salud.
+Introducir el uso de Inteligencia Artificial aplicada a la salud, alineada con tendencias tecnológicas actuales.
+Incorporar movilidad clínica mediante una aplicación móvil desarrollada en React Native, permitiendo a los médicos realizar consultas a pie de cama del paciente.
+Servir como un caso práctico de aplicación de Scrum en un contexto académico.
+Alcance del Proyecto
+Incluye
+Aplicación móvil multiplataforma desarrollada en React Native.
+Backend basado en Django REST Framework (API REST).
+Registro y gestión de pacientes.
+Historial clínico digital.
+Diagnóstico asistido por IA.
+Autenticación mediante tokens JWT.
+Generación de reportes clínicos.
+Despliegue académico de bajo costo.
+Distribución mediante archivo APK.
+No Incluye
+Sustitución del diagnóstico médico profesional.
+Automatización de decisiones clínicas finales.
+Integración con dispositivos médicos externos.
+Certificaciones sanitarias oficiales.
+Publicación en Google Play Store oficial (se distribuye por descarga directa).
+Tecnologías a Utilizar
+Frontend (Cliente Móvil)
+React Native
+Expo
+React Navigation
+Axios
+Backend
+Python
+Django
+Django REST Framework
+JWT
+Base de Datos
+SQL Server
+ORM de Django
+Inteligencia Artificial
+scikit-learn / TensorFlow
+Arquitectura de Software
+El sistema adopta una arquitectura desacoplada basada en servicios REST, abandonando el renderizado del lado del servidor (SSR).
+Componentes
+Backend (API Core)
+Django REST Framework
+Lógica de negocio
+Base de datos SQL Server
+Servicio de inferencia IA
+Frontend (Cliente Móvil)
+React Native con Expo
+Consumo de API REST
+Interfaces móviles optimizadas
+El Agente de Diagnóstico por IA
+El módulo de IA se implementa como un Servicio de Inferencia integrado en el backend.
+Flujo
+Entrada: JSON con síntomas enviados desde la app móvil.
+Procesamiento: Script Python que ejecuta el modelo de IA.
+Salida: Score de probabilidad y recomendación preliminar validada por el médico.
+En lugar de un simple script, la IA debe integrarse como un Servicio de Inferencia dentro de Django.
+Cómo funciona: El usuario envía sus síntomas desde la app móvil (React Native) a un endpoint específico de Django (ej. /api/diagnostico/).
+Procesamiento: Django recibe los datos, los limpia y los pasa a tu modelo de IA (que puede ser un modelo de Machine Learning local con scikit-learn o una llamada a una API de LLM).
+Respuesta: El "Agente" devuelve un JSON con la probabilidad del diagnóstico y recomendaciones preliminares.
++2
+Módulos necesarios
+Se agregó una sección llamada "Especificación de la API" para demostrar profundidad técnica:
+Módulo de Seguridad (JWT)
+Implementación de autenticación basada en tokens JWT para permitir que la aplicación móvil mantenga la sesión del médico activa entre pantallas, sin solicitar credenciales en cada interacción.
+Módulo de Gestión de Pacientes
+Exposición de endpoints REST para la administración de pacientes desde la aplicación móvil, tales como:
+GET /api/pacientes/ para la consulta del listado de pacientes.
+POST /api/pacientes/ para el registro de nuevos pacientes desde el cliente móvil.
+Módulo de Historial Clínico
+Generación de documentos PDF del historial clínico del paciente desde el backend, mediante un servicio de generación de reportes, los cuales son entregados a la aplicación móvil a través de la API REST para su descarga y previsualización en el dispositivo.
+Especificación de la API
+Endpoints Principales
+Tabla 1 Endpoints Principales
+Módulo
+Endpoint
+Método
+Acción
+Autenticación
+/api/auth/login/
+POST
+Inicio de sesión (JWT)
+Pacientes
+/api/pacientes/
+GET / POST
+Listar y registrar pacientes
+Historial Clínico
+/api/historial/<id_paciente>/
+GET
+Consultar historial
+Diagnóstico IA
+/api/diagnostico/analizar/
+POST
+Análisis de síntomas
+Principales Interesados (Stakeholders)
+Tabla 2 Stakeholders
+Stakeholder
+Descripción
+Interés en el sistema
+Rol dentro del proyecto
+Profesionales de la salud (médicos)
+Personal médico encargado de la atención clínica y del registro de información de los pacientes.
+Utilizar el sistema para gestionar información médica de manera eficiente, segura y confiable.
+Usuarios directos del sistema; aportan requerimientos funcionales y validan la utilidad clínica del software.
+Pacientes
+Personas que reciben atención médica y cuyos datos son administrados dentro del sistema.
+Garantizar que su información personal y médica sea tratada con confidencialidad y precisión.
+Beneficiarios indirectos del sistema; su información constituye la base de operación del software.
+Institución educativa
+Entidad académica responsable de supervisar y avalar el desarrollo del proyecto.
+Asegurar que el proyecto cumpla con los objetivos académicos, metodológicos y éticos establecidos.
+Supervisión académica y validación institucional del proyecto.
+Equipo de desarrollo
+Grupo encargado del análisis, diseño, implementación y pruebas del sistema.
+Desarrollar un sistema funcional, eficiente y alineado con los requerimientos definidos.
+Responsable del desarrollo técnico, documentación y mantenimiento del sistema.
+Evaluadores del proyecto
+Docentes o jurado académico que revisan y califican el proyecto.
+Verificar el cumplimiento de criterios técnicos, académicos y documentales.
+Evaluación y calificación del proyecto final.
+Usuarios finales del sistema
+Personas autorizadas que utilizan el sistema en su operación diaria.
+Disponer de un sistema intuitivo, estable y eficiente para la gestión de información.
+Uso operativo del sistema y retroalimentación para mejoras futuras.
+Infraestructura
+Tabla 3 Infraestructura
+Componente
+Servicio
+Razón
+Backend
+Render / Railway
+Plan gratuito compatible
+Base de Datos
+Azure for Students
+SQL Server sin costo
+Frontend Dev
+Expo Go
+Visualización por QR
+APK
+EAS Build
+Build gratuito
+Diagrama de Arquitectura
+Metodología de Trabajo
+El proyecto se desarrolla bajo la metodología ágil Scrum, organizando el trabajo en sprints de duración fija, con entregables funcionales al final de cada iteración. El Product Owner prioriza el backlog de acuerdo con las necesidades del sistema de salud, mientras que el equipo de desarrollo implementa, integra y prueba los módulos del sistema, incluyendo la aplicación móvil, la API REST y el servicio de diagnóstico asistido por inteligencia artificial, promoviendo la mejora continua, la retroalimentación temprana y la validación incremental del producto.
+Equipo de Trabajo
+Tabla 4 Equipo de Trabajo
+Integrante
+Rol
+Responsabilidades
+Andrea Robles Hernández
+Backend / IA
+Endpoints, IA, conectividad
+Juan Pablo González Arauz
+Frontend Mobile
+React Native, consumo API
+Itzel Galván Contreras
+UX/UI
+Diseño móvil
+Jerónimo Israel Macías Quintero
+Documentador / RRHH
+Documentación y gestión
+Organigrama Mixto
+Cronograma Desarrollo Scrum
+Duración estimada: 4 Sprints + Correcciones
+Requerimientos
+Requerimientos Funcionales
+Tabla 5 Requerimientos Funcionales
+ID
+Nombre del requerimiento
+Descripción
+Criterio de aceptación
+RF-01
+Autenticación de médicos
+El sistema deberá permitir al médico iniciar sesión desde la aplicación móvil utilizando credenciales válidas y obtener un token JWT.
+El sistema permite el acceso cuando las credenciales son correctas y devuelve un token JWT válido en menos de 3 segundos.
+RF-02
+Registro de pacientes
+El sistema deberá permitir registrar pacientes desde la aplicación móvil mediante el endpoint /api/pacientes/.
+Un paciente queda almacenado en la base de datos y es retornado en la consulta GET.
+RF-03
+Consulta de pacientes
+El sistema deberá permitir consultar el listado de pacientes registrados.
+La aplicación muestra la lista de pacientes obtenida desde la API.
+RF-04
+Consulta de historial clínico
+El sistema deberá permitir consultar el historial clínico de un paciente mediante el endpoint /api/historial/{id_paciente}/.
+El sistema devuelve el historial correspondiente al identificador enviado.
+RF-05
+Registro de eventos clínicos
+El sistema deberá permitir registrar nuevos eventos clínicos dentro del historial de un paciente.
+El evento queda persistido y es visible al volver a consultar el historial.
+RF-06
+Generación de PDF clínico
+El sistema deberá generar un archivo PDF del historial clínico desde el backend.
+El archivo PDF es generado y puede descargarse desde la aplicación móvil.
+RF-07
+Visualización de PDF
+El sistema deberá permitir la descarga y previsualización del PDF del historial clínico desde la aplicación móvil.
+El PDF se abre correctamente en el dispositivo móvil.
+RF-08
+Envío de síntomas a IA
+El sistema deberá permitir enviar los síntomas del paciente al servicio de diagnóstico asistido mediante el endpoint /api/diagnostico/analizar/.
+La API recibe un JSON válido con los síntomas.
+RF-09
+Procesamiento de diagnóstico por IA
+El sistema deberá procesar los síntomas mediante el modelo de inteligencia artificial.
+El sistema devuelve un score de probabilidad y una recomendación preliminar.
+RF-10
+Visualización del resultado de IA
+El sistema deberá mostrar el resultado del análisis de IA en la aplicación móvil.
+El resultado se presenta en pantalla con el score y la recomendación.
+RF-11
+Cierre de sesión
+El sistema deberá permitir al médico cerrar sesión.
+El token deja de utilizarse para acceder a los endpoints protegidos.
+RF-12
+Registro básico de accesos
+El sistema deberá registrar los accesos al sistema.
+Se almacena fecha, usuario y tipo de operación.
+Requerimientos No Funcionales
+Tabla 6 Requerimientos No Funcionales
+ID
+Categoría
+Requerimiento
+Criterio de aceptación
+RNF-01
+Seguridad
+El sistema deberá utilizar autenticación basada en tokens JWT en todos los endpoints protegidos.
+Toda petición sin token válido es rechazada con código 401.
+RNF-02
+Seguridad
+La comunicación entre la aplicación móvil y la API deberá realizarse mediante HTTPS.
+No se permite conexión por HTTP en el entorno productivo.
+RNF-03
+Rendimiento
+El tiempo de respuesta de los endpoints principales no deberá exceder los 3 segundos.
+El 90% de las peticiones se responden en ≤ 3 s.
+RNF-04
+Disponibilidad
+El sistema deberá mantener una disponibilidad mínima del 95% durante el periodo de evaluación.
+Registro de uptime ≥ 95%.
+RNF-05
+Usabilidad
+La consulta del historial clínico deberá realizarse en un máximo de tres interacciones principales.
+El flujo de uso cumple con el número máximo de pasos.
+RNF-06
+Escalabilidad
+La arquitectura deberá permitir agregar nuevos módulos sin modificar los existentes.
+Un nuevo módulo se integra sin afectar endpoints actuales.
+RNF-07
+Compatibilidad
+La aplicación móvil deberá ejecutarse en dispositivos Android versión 9 o superior.
+Prueba exitosa en al menos un dispositivo Android 9+.
+RNF-08
+Mantenibilidad
+El backend deberá estar estructurado en módulos independientes.
+Cada módulo posee su propia capa de vistas, serializado-res y servicios.
+RNF-09
+Portabilidad
+El sistema deberá poder desplegarse en Render o Railway sin cambios mayores al código.
+Despliegue exitoso en al menos una de las plataformas.
+RNF-10
+Integridad de datos
+El sistema deberá garantizar la integridad de los datos clínicos.
+Uso de claves foráneas, validaciones y restricciones activas en la base de datos.
+Diagramas
+Casos de Uso
+Diagrama de Componentes
+Diagrama de Entidad Relación
+Diagrama de Procesos
+Diagrama de Secuencia
+Diagrama de Despliegue
+Diagrama de Actividades
+Estrategia de Conexión y Despliegue
+Para visualizar el proyecto en tu teléfono con Expo, necesitamos considerar los siguientes puntos técnicos:
+Conexión en Desarrollo (Local):
+IP Local: El celular y la computadora deben estar en la misma red Wi-Fi.
+Configuración de Django: Debes agregar tu IP local en el archivo settings.py:
+ALLOWED_HOSTS = ['tu-ip-local', '127.0.0.1']
+CORS: Instalar django-cors-headers para permitir que la app de React Native acepte datos del servidor Django.
+Despliegue (Producción):
+Backend: Se recomienda usar un servicio como Azure o AWS que soporte SQL Server y Python/Django.
++1
+Frontend: Generar el archivo .apk (Android) o .ipa (iOS) usando EAS Build (Expo Application Services).
+Seguridad: Implementar HTTPS y autenticación por Tokens (JWT) para proteger los datos médicos sensibles
+Infraestructura y Despliegue (Costo Mínimo/Gratis)
+Para un proyecto académico, AWS puede ser costoso si te sales de la capa gratuita. Por ello se usarán estás opciones:
+Backend (Django): Render o Railway: Tienen planes gratuitos o de "pago por uso" muy bajos (aprox. $5 USD/mes) que son más fáciles de configurar que AWS para estudiantes.
+Base de Datos (SQL Server): * Si es obligatorio usar SQL Server, puedes usar la versión Express en un servidor local o buscar el nivel gratuito de Azure SQL Database (que suele dar 12 meses gratis a estudiantes).
+Frontend (App Móvil):
+Expo Go: Para la fase de desarrollo y revisión académica, no necesitas desplegar nada. Los profesores pueden escanear un código QR y ver la app en sus teléfonos al instante.
+APK (Android): Se genera usando EAS Build (eas build -p android --profile preview). Expo te permite hacer builds en la nube de forma gratuita (con cola de espera).
+En caso de usar AWS::
+App Runner: Para desplegar el contenedor de Django de forma sencilla.
+RDS (SQL Server): Ojo, es caro. Solo úsalo si tienes créditos de estudiante de AWS Educate.
+S3: Para guardar reportes clínicos o imágenes si el proyecto lo requiere.
+Desglose de Tecnologías para el Despliegue
+Debes agregar una tabla de Infraestructura Cloud Académica para justificar cómo mantendrás los costos en $0 o mínimos:
+Tabla 7 Tecnologías de Despliegue
+Componente
+Servicio Sugerido (Costo $0)
+Razón del uso
+Backend API
+Render / Railway
+Ofrecen "Free Tiers" para aplicaciones Python/Django más simples que AWS.
+Base de Datos
+Azure for Students
+Proporciona crédito gratuito para SQL Server, esencial para el proyecto.
+Frontend (Dev)
+Expo Go
+Permite previsualizar la app en el teléfono físico escaneando un código QR sin pagar licencias de Apple/Google.
+Build de APK
+EAS Build (Expo)
+Servicio en la nube para generar el instalador .apk de forma gratuita.
+Conclusión
+El proyecto se desarrolla bajo una arquitectura cliente–servidor desacoplada, basada en una API REST construida con Django REST Framework y un cliente móvil desarrollado en React Native. Esta solución garantiza movilidad clínica, escalabilidad, seguridad y viabilidad académica, manteniendo costos mínimos y alineándose con la metodología Scrum.
+Referencias
+Pressman, R. S. (1992). Ingeniería del software: un enfoque práctico.
+Rocha et al. (2021). Information Technology and Systems. Springer.
+Piattini et al. (2019). Quality of Information and Communications Technology. Springer.
