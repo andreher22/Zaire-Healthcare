@@ -16,20 +16,26 @@ DEBUG = True
 # BASE DE DATOS - SQL Server Express (Local)
 # =============================================================================
 
+# Base de datos (SQLite por defecto para desarrollo simple y demo)
 DATABASES = {
     'default': {
-        'ENGINE': 'mssql',
-        'NAME': config('DB_NAME', default='zaire_healthcare'),
-        'USER': config('DB_USER', default='sa'),
-        'PASSWORD': config('DB_PASSWORD', default=''),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='1433'),
-        'OPTIONS': {
-            'driver': 'ODBC Driver 17 for SQL Server',
-            'extra_params': 'TrustServerCertificate=yes',
-        },
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# Configuración SQL Server (Comentada para evitar errores de driver si no está instalado)
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'mssql',
+#         'NAME': 'ZaireDB',
+#         'HOST': 'localhost\\SQLEXPRESS',
+#         'PORT': '',
+#         'OPTIONS': {
+#             'driver': 'ODBC Driver 17 for SQL Server',
+#         },
+#     }
+# }
 
 
 # =============================================================================
