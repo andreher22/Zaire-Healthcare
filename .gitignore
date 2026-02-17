@@ -1,0 +1,120 @@
+# ===========================
+# ZAIRE Healthcare .gitignore
+# ===========================
+
+# ---------- Python / Django ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+.eggs/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Entorno virtual
+venv/
+env/
+.venv/
+ENV/
+
+# Variables de entorno (SENSIBLES)
+.env
+.env.local
+.env.production
+.env.staging
+
+# Django
+*.log
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+static_collected/
+
+# Migraciones generadas (opcional, descomenta si NO quieres trackearlas)
+# */migrations/
+
+# ---------- Machine Learning / IA ----------
+*.pkl
+*.h5
+*.hdf5
+*.joblib
+*.model
+*.pb
+backend/apps/diagnostico/ml/modelos_guardados/
+!backend/apps/diagnostico/ml/modelos_guardados/.gitkeep
+
+# Datasets descargados
+datasets/
+*.csv
+!backend/apps/diagnostico/ml/datasets/.gitkeep
+
+# ---------- Node.js / React Native ----------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp
+.pnp.js
+
+# ---------- Expo ----------
+.expo/
+dist/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Expo EAS
+.easignore
+
+# ---------- Builds ----------
+*.apk
+*.aab
+*.ipa
+*.app
+
+# ---------- IDEs ----------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# ---------- OS ----------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ---------- Docker ----------
+docker-compose.override.yml
+
+# ---------- Documentos extraídos (temporales) ----------
+DOC-ZAIRE-extracted.txt
+doc_images/
+
+# ---------- Misc ----------
+*.bak
+*.tmp
+*.temp
+coverage/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.pytest_cache/
