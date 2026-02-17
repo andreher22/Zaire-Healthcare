@@ -3,11 +3,30 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { colors } from '../constants/colors';
 
-// Pantallas
-import HomeScreen from '../screens/HomeScreen';
-import PacientesScreen from '../screens/PacientesScreen';
-import DiagnosticoScreen from '../screens/DiagnosticoScreen';
-import HistorialScreen from '../screens/HistorialScreen';
+import NuevoPacienteScreen from '../screens/NuevoPacienteScreen';
+import DetallePacienteScreen from '../screens/DetallePacienteScreen';
+
+const PacientesStack = createStackNavigator();
+
+const PacientesNavigator = () => (
+    <PacientesStack.Navigator>
+        <PacientesStack.Screen
+            name="ListaPacientes"
+            component={PacientesScreen}
+            options={{ headerShown: false }}
+        />
+        <PacientesStack.Screen
+            name="NuevoPaciente"
+            component={NuevoPacienteScreen}
+            options={{ title: 'Registrar Paciente' }}
+        />
+        <PacientesStack.Screen
+            name="DetallePaciente"
+            component={DetallePacienteScreen}
+            options={{ title: 'Detalle del Paciente' }}
+        />
+    </PacientesStack.Navigator>
+);
 
 const Tab = createBottomTabNavigator();
 
@@ -42,11 +61,12 @@ const MainNavigator = () => {
             />
             <Tab.Screen
                 name="Pacientes"
-                component={PacientesScreen}
+                component={PacientesNavigator}
                 options={{
                     tabBarIcon: ({ color, size }) => (
                         <Icon name="account-group" color={color} size={size} />
                     ),
+                    headerShown: false,
                 }}
             />
             <Tab.Screen
