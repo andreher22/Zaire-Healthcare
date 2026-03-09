@@ -8,11 +8,13 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { AuthProvider } from './src/context/AuthContext';
 import { theme } from './src/constants/colors';
 
+import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+
 export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <PaperProvider theme={theme}>
+        <PaperProvider theme={theme} settings={{ icon: props => <Icon {...props} /> }}>
           <StatusBar style="dark" backgroundColor={theme.colors.background} />
           <AppNavigator />
         </PaperProvider>

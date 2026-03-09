@@ -58,6 +58,22 @@ class LoginSerializer(serializers.Serializer):
         return data
 
 
+class EditarPerfilSerializer(serializers.ModelSerializer):
+    """Serializer para editar el perfil del usuario autenticado."""
+
+    class Meta:
+        model = Usuario
+        fields = ['nombre']
+
+    def validate_nombre(self, value):
+        """Validar que el nombre tenga al menos 3 caracteres."""
+        if len(value.strip()) < 3:
+            raise serializers.ValidationError(
+                'El nombre debe tener al menos 3 caracteres.'
+            )
+        return value.strip()
+
+
 class RegistroAccesoSerializer(serializers.ModelSerializer):
     """Serializer para registros de acceso."""
     usuario_nombre = serializers.CharField(source='usuario.nombre', read_only=True)
