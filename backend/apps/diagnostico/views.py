@@ -18,6 +18,7 @@ class DiagnosticarView(APIView):
     """
     POST /api/diagnostico/predecir/
     Enviar síntomas y obtener diagnóstico asistido por IA (RF-08).
+    Al diagnosticar, se crea automáticamente un evento clínico en el historial.
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -54,6 +55,46 @@ class DiagnosticarView(APIView):
             diagnostico_predicho=resultado['diagnostico'],
             confianza=resultado['confianza'],
             top_predicciones=resultado['top_predicciones'],
+        )
+
+        # ─── Crear EventoClinico automático en el historial ───
+        from apps.historial.models import HistorialClinico, EventoClinico
+
+        historial, _created = HistorialClinico.objects.get_or_create(
+            paciente=paciente
+        )
+
+        # Formatear síntomas legibles
+        sintomas_texto = ', '.join(
+            s.replace('_', ' ').title() for s in sintomas
+        )
+
+        # Formatear top predicciones
+        tops_texto = '\n'.join(
+            f"  • {p['diagnostico']}: {p['confianza']}%"
+            for p in resultado.get('top_predicciones', [])
+        )
+
+        descripcion = (
+            f"Diagnóstico asistido por IA — ZAIRE Healthcare\n"
+            f"Confianza: {resultado['confianza']}%\n"
+            f"Síntomas analizados: {len(sintomas)}"
+        )
+
+        diagnostico_texto = (
+            f"{resultado['diagnostico']} "
+            f"(Confianza: {resultado['confianza']}%)\n\n"
+            f"Otras posibilidades:\n{tops_texto}"
+        )
+
+        EventoClinico.objects.create(
+            historial=historial,
+            tipo=EventoClinico.TipoEvento.DIAGNOSTICO,
+            descripcion=descripcion,
+            sintomas=sintomas_texto,
+            diagnostico=diagnostico_texto,
+            tratamiento='',
+            notas=f'Generado automáticamente por IA. ID resultado: {resultado_ia.id}',
         )
 
         # Registrar operación de diagnóstico (RF-12)

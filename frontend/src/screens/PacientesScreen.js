@@ -1,123 +1,208 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, FlatList, StyleSheet, RefreshControl } from 'react-native';
-import { Text, FAB, Searchbar, ActivityIndicator, Card, Avatar, IconButton } from 'react-native-paper';
+/**
+ * ZAIRE Healthcare — PacientesScreen
+ * Pantalla de gestión de pacientes (CRUD) con diseño responsive.
+ * Muestra lista de pacientes en cards, búsqueda, filtros, y FAB para nuevos.
+ * En desktop: cards en grid de 2 columnas. En móvil: lista vertical.
+ */
+import React, { useState, useCallback } from 'react';
+import {
+    View, FlatList, StyleSheet, Alert,
+    useWindowDimensions, RefreshControl, TouchableOpacity, TextInput as RNTextInput
+} from 'react-native';
+import {
+    Text, Surface, Divider
+} from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '../constants/colors';
 import PacientesService from '../services/PacientesService';
+import LoadingSpinner from '../components/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
 
 const PacientesScreen = ({ navigation }) => {
+    const { width } = useWindowDimensions();
+    const isDesktop = width > 768;
+
     const [pacientes, setPacientes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
+    const [search, setSearch] = useState('');
+    const [filtroSexo, setFiltroSexo] = useState(null);
 
-    const loadPacientes = async () => {
-        try {
-            const params = {};
-            if (searchQuery) {
-                params.search = searchQuery;
-            }
-
-            const data = await PacientesService.getPacientes(params);
-            setPacientes(data.results || []);
-        } catch (error) {
-            console.error('Error cargando pacientes:', error);
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
-    };
-
-    // Cargar al enfocar la pantalla
+    /** Cargar pacientes al enfocar la pantalla. */
     useFocusEffect(
         useCallback(() => {
             loadPacientes();
-        }, [searchQuery])
+        }, [])
     );
 
-    const onRefresh = () => {
+    /** Cargar lista de pacientes desde la API. */
+    const loadPacientes = async () => {
+        try {
+            const data = await PacientesService.getPacientes();
+            setPacientes(Array.isArray(data) ? data : data.results || []);
+        } catch (error) {
+            console.log('Error cargando pacientes:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    /** Pull-to-refresh. */
+    const onRefresh = useCallback(async () => {
         setRefreshing(true);
-        loadPacientes();
-    };
+        await loadPacientes();
+        setRefreshing(false);
+    }, []);
 
+    /** Filtrar pacientes por búsqueda y filtro de sexo. */
+    const filteredPacientes = pacientes.filter(p => {
+        const matchSearch = p.nombre.toLowerCase().includes(search.toLowerCase()) ||
+            (p.contacto && p.contacto.includes(search));
+        const matchSexo = !filtroSexo || p.sexo === filtroSexo;
+        return matchSearch && matchSexo;
+    });
+
+    /** Obtener iniciales del nombre. */
     const getInitials = (name) => {
-        return name
-            ? name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase()
-            : 'PAC';
+        if (!name) return '?';
+        return name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
     };
 
-    const renderItem = ({ item }) => (
-        <Card
-            style={styles.card}
+    /** Renderizar cada card de paciente. */
+    const renderPaciente = ({ item }) => (
+        <TouchableOpacity
+            style={[styles.card, isDesktop && styles.cardDesktop]}
             onPress={() => navigation.navigate('DetallePaciente', { pacienteId: item.id })}
-            mode="elevated"
+            activeOpacity={0.7}
         >
-            <Card.Title
-                title={item.nombre}
-                subtitle={`${item.edad} años • ${item.sexo === 'M' ? 'Masculino' : item.sexo === 'F' ? 'Femenino' : 'Otro'}`}
-                left={(props) => (
-                    <Avatar.Text
-                        {...props}
-                        label={getInitials(item.nombre)}
-                        style={{ backgroundColor: colors.darkOliveGreen }}
-                        color={colors.white}
-                    />
-                )}
-                right={(props) => (
-                    <IconButton {...props} icon="chevron-right" onPress={() => navigation.navigate('DetallePaciente', { pacienteId: item.id })} />
-                )}
-            />
-            <Card.Content>
-                <Text variant="bodyMedium" style={{ color: colors.darkGray }}>
-                    📞 {item.contacto || 'Sin contacto'}
-                </Text>
-            </Card.Content>
-        </Card>
+            <Surface style={styles.cardInner} elevation={2}>
+                <View style={styles.cardHeader}>
+                    <View style={[styles.avatar, { backgroundColor: item.sexo === 'F' ? colors.fawn + '25' : colors.darkOliveGreen + '18' }]}>
+                        <MaterialCommunityIcons
+                            name={item.sexo === 'F' ? 'face-woman' : 'face-man'}
+                            size={24}
+                            color={item.sexo === 'F' ? colors.fawn : colors.darkOliveGreen}
+                        />
+                    </View>
+                    <View style={styles.cardInfo}>
+                        <Text style={styles.cardName} numberOfLines={1}>{item.nombre}</Text>
+                        <Text style={styles.cardSub}>
+                            {item.edad} años • {item.sexo === 'M' ? 'Masculino' : 'Femenino'}
+                        </Text>
+                    </View>
+                    <MaterialCommunityIcons name="chevron-right" size={22} color={colors.fawn} />
+                </View>
+
+                <Divider style={styles.cardDivider} />
+
+                <View style={styles.cardDetails}>
+                    {item.contacto && (
+                        <View style={styles.detailRow}>
+                            <MaterialCommunityIcons name="phone" size={16} color={colors.darkGray} />
+                            <Text style={styles.detailText}>{item.contacto}</Text>
+                        </View>
+                    )}
+                    {item.direccion && (
+                        <View style={styles.detailRow}>
+                            <MaterialCommunityIcons name="map-marker-outline" size={16} color={colors.darkGray} />
+                            <Text style={styles.detailText} numberOfLines={1}>{item.direccion}</Text>
+                        </View>
+                    )}
+                    <View style={styles.cardActions}>
+                        <TouchableOpacity
+                            style={styles.actionChip}
+                            onPress={() => navigation.navigate('Historial', { pacienteId: item.id })}
+                        >
+                            <MaterialCommunityIcons name="clipboard-text-clock" size={14} color={colors.darkOliveGreen} />
+                            <Text style={styles.actionChipText}>Historial</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.actionChip, { backgroundColor: colors.liver + '12' }]}
+                            onPress={() => navigation.navigate('Diagnostico', { pacienteId: item.id })}
+                        >
+                            <MaterialCommunityIcons name="brain" size={14} color={colors.liver} />
+                            <Text style={[styles.actionChipText, { color: colors.liver }]}>IA</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Surface>
+        </TouchableOpacity>
     );
+
+    if (loading) return <LoadingSpinner message="Cargando pacientes..." />;
 
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <Text variant="headlineMedium" style={styles.title}>Mis Pacientes</Text>
-                <Text variant="bodyMedium" style={styles.subtitle}>Gestión y seguimiento</Text>
+            <View style={[styles.content, isDesktop && styles.contentDesktop]}>
+                {/* Header */}
+                <View style={styles.header}>
+                    <Text style={styles.title}>Pacientes</Text>
+                    <Text style={styles.count}>{filteredPacientes.length} registrados</Text>
+                </View>
+
+                {/* Búsqueda */}
+                <View style={styles.search}>
+                    <MaterialCommunityIcons name="magnify" size={20} color={colors.darkOliveGreen} style={{ marginRight: 8 }} />
+                    <RNTextInput
+                        placeholder="Buscar por nombre o contacto..."
+                        value={search}
+                        onChangeText={setSearch}
+                        style={styles.searchInput}
+                        placeholderTextColor={colors.darkGray}
+                    />
+                    {search.length > 0 && (
+                        <TouchableOpacity onPress={() => setSearch('')}>
+                            <MaterialCommunityIcons name="close-circle" size={18} color={colors.darkGray} />
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                {/* Filtros */}
+                <View style={styles.filters}>
+                    {[{ label: 'Todos', val: null }, { label: 'Masculino', val: 'M' }, { label: 'Femenino', val: 'F' }].map(f => (
+                        <TouchableOpacity
+                            key={f.label}
+                            style={[styles.filterChip, filtroSexo === f.val && styles.filterChipActive]}
+                            onPress={() => setFiltroSexo(filtroSexo === f.val ? null : f.val)}
+                        >
+                            <Text style={filtroSexo === f.val ? styles.filterChipTextActive : styles.filterChipText}>{f.label}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+
+                {/* Lista de pacientes */}
+                {filteredPacientes.length === 0 ? (
+                    <EmptyState
+                        icon="account-search-outline"
+                        title="Sin resultados"
+                        message={search ? 'No se encontraron pacientes con ese criterio.' : 'No hay pacientes registrados aún.'}
+                    />
+                ) : (
+                    <FlatList
+                        data={filteredPacientes}
+                        renderItem={renderPaciente}
+                        keyExtractor={(item) => item.id.toString()}
+                        numColumns={isDesktop ? 2 : 1}
+                        key={isDesktop ? 'desktop' : 'mobile'}
+                        refreshControl={
+                            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.darkOliveGreen]} />
+                        }
+                        contentContainerStyle={styles.listContent}
+                        showsVerticalScrollIndicator={false}
+                    />
+                )}
             </View>
 
-            <Searchbar
-                placeholder="Buscar por nombre..."
-                onChangeText={setSearchQuery}
-                value={searchQuery}
-                style={styles.searchbar}
-                iconColor={colors.darkOliveGreen}
-                inputStyle={{ color: colors.kombuGreen }}
-                elevation={1}
-            />
-
-            {loading && !refreshing ? (
-                <ActivityIndicator size="large" color={colors.darkOliveGreen} style={styles.loader} />
-            ) : (
-                <FlatList
-                    data={pacientes}
-                    renderItem={renderItem}
-                    keyExtractor={(item) => item.id.toString()}
-                    contentContainerStyle={styles.list}
-                    refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.darkOliveGreen]} />
-                    }
-                    ListEmptyComponent={
-                        <View style={styles.emptyContainer}>
-                            <Text variant="bodyLarge" style={{ color: colors.darkGray }}>No se encontraron pacientes.</Text>
-                        </View>
-                    }
-                />
-            )}
-
-            <FAB
-                icon="plus"
+            {/* Botón nuevo paciente */}
+            <TouchableOpacity
                 style={styles.fab}
-                color={colors.white}
                 onPress={() => navigation.navigate('NuevoPaciente')}
-                label="Nuevo"
-            />
+                activeOpacity={0.85}
+            >
+                <MaterialCommunityIcons name="plus" size={24} color={colors.white} />
+                {isDesktop && <Text style={styles.fabLabel}>Nuevo Paciente</Text>}
+            </TouchableOpacity>
         </View>
     );
 };
@@ -127,47 +212,184 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: colors.cornsilk,
     },
+    content: {
+        flex: 1,
+        padding: 14,
+    },
+    contentDesktop: {
+        maxWidth: 1000,
+        alignSelf: 'center',
+        width: '100%',
+    },
+
+    // Header
     header: {
-        padding: 20,
-        paddingBottom: 10,
-        backgroundColor: colors.white,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'baseline',
+        marginBottom: 12,
     },
     title: {
+        fontSize: 22,
+        fontWeight: '700',
         color: colors.kombuGreen,
-        fontWeight: 'bold',
     },
-    subtitle: {
-        color: colors.darkOliveGreen,
+    count: {
+        fontSize: 13,
+        color: colors.darkGray,
     },
-    searchbar: {
-        margin: 15,
+
+    // Search
+    search: {
         backgroundColor: colors.white,
-        borderRadius: 10,
-    },
-    list: {
-        padding: 15,
-        paddingTop: 0,
-        paddingBottom: 80, // Espacio para el FAB
-    },
-    card: {
-        marginBottom: 10,
-        backgroundColor: colors.white,
-    },
-    loader: {
-        marginTop: 50,
-    },
-    emptyContainer: {
+        borderRadius: 14,
+        marginBottom: 12,
+        flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 50,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        elevation: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 3,
     },
+    searchInput: {
+        fontSize: 14,
+        flex: 1,
+        color: colors.kombuGreen,
+        outlineStyle: 'none',
+    },
+
+    // Filters
+    filters: {
+        flexDirection: 'row',
+        marginBottom: 14,
+    },
+    filterChip: {
+        marginRight: 8,
+        backgroundColor: colors.white,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+    },
+    filterChipActive: {
+        backgroundColor: colors.darkOliveGreen,
+    },
+    filterChipText: {
+        color: colors.darkGray,
+    },
+    filterChipTextActive: {
+        color: colors.white,
+    },
+
+    // Card
+    card: {
+        flex: 1,
+        paddingHorizontal: 2,
+        marginBottom: 10,
+    },
+    cardDesktop: {
+        maxWidth: '50%',
+        paddingHorizontal: 6,
+    },
+    cardInner: {
+        borderRadius: 16,
+        backgroundColor: colors.white,
+        overflow: 'hidden',
+    },
+    cardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 14,
+    },
+    avatar: {
+        width: 44,
+        height: 44,
+        borderRadius: 14,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    cardInfo: {
+        flex: 1,
+    },
+    cardName: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: colors.kombuGreen,
+    },
+    cardSub: {
+        fontSize: 12,
+        color: colors.darkGray,
+        marginTop: 2,
+    },
+    cardDivider: {
+        marginHorizontal: 14,
+    },
+    cardDetails: {
+        paddingHorizontal: 14,
+        paddingBottom: 14,
+        paddingTop: 10,
+    },
+    detailRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 6,
+    },
+    detailText: {
+        fontSize: 13,
+        color: colors.darkGray,
+        marginLeft: 8,
+        flex: 1,
+    },
+    cardActions: {
+        flexDirection: 'row',
+        marginTop: 8,
+    },
+    actionChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.darkOliveGreen + '12',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+        marginRight: 8,
+    },
+    actionChipText: {
+        fontSize: 12,
+        color: colors.darkOliveGreen,
+        fontWeight: '600',
+        marginLeft: 4,
+    },
+
+    // List
+    listContent: {
+        paddingBottom: 80,
+    },
+
+    // FAB
     fab: {
         position: 'absolute',
-        margin: 16,
-        right: 0,
-        bottom: 0,
+        right: 20,
+        bottom: 20,
         backgroundColor: colors.darkOliveGreen,
+        borderRadius: 16,
+        paddingHorizontal: 18,
+        paddingVertical: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+    },
+    fabLabel: {
+        color: colors.white,
+        fontWeight: '700',
+        fontSize: 14,
+        marginLeft: 8,
     },
 });
 

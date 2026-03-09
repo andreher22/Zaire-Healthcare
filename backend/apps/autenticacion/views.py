@@ -2,11 +2,13 @@ from rest_framework import status, generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.db.models import Count, Q
 from .models import Usuario, RegistroAcceso
 from .serializers import (
     UsuarioSerializer,
     RegistroUsuarioSerializer,
     LoginSerializer,
+    EditarPerfilSerializer,
     RegistroAccesoSerializer,
 )
 
@@ -103,14 +105,104 @@ class RegistroUsuarioView(APIView):
 
 class PerfilView(APIView):
     """
-    GET /api/auth/perfil/
-    Obtener perfil del usuario autenticado.
+    GET  /api/auth/perfil/ — Obtener perfil del usuario autenticado.
+    PUT  /api/auth/perfil/ — Actualizar datos del perfil.
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        """Retornar datos del perfil del usuario autenticado."""
         serializer = UsuarioSerializer(request.user)
         return Response(serializer.data)
+
+    def put(self, request):
+        """Actualizar datos editables del perfil (nombre)."""
+        serializer = EditarPerfilSerializer(
+            request.user, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({
+            'mensaje': 'Perfil actualizado correctamente',
+            'usuario': UsuarioSerializer(request.user).data,
+        })
+
+    def patch(self, request):
+        """Alias de PUT para actualización parcial."""
+        return self.put(request)
+
+
+class EstadisticasView(APIView):
+    """
+    GET /api/auth/estadisticas/
+    Retornar estadísticas del dashboard para el médico autenticado.
+    Incluye conteos reales de pacientes, diagnósticos y pendientes.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        """Calcular y retornar estadísticas en tiempo real."""
+        from apps.pacientes.models import Paciente
+        from apps.diagnostico.models import ResultadoIA
+        from apps.historial.models import EventoClinico
+        from django.utils import timezone
+        from datetime import timedelta
+
+        usuario = request.user
+        hoy = timezone.now().date()
+        inicio_semana = hoy - timedelta(days=hoy.weekday())
+
+        # Conteos generales
+        total_pacientes = Paciente.objects.filter(usuario=usuario).count()
+        total_diagnosticos = ResultadoIA.objects.filter(
+            paciente__usuario=usuario
+        ).count()
+        pendientes = ResultadoIA.objects.filter(
+            paciente__usuario=usuario,
+            estado='pendiente'
+        ).count()
+
+        # Estadísticas de la semana
+        diagnosticos_semana = ResultadoIA.objects.filter(
+            paciente__usuario=usuario,
+            fecha__date__gte=inicio_semana
+        ).count()
+        pacientes_semana = Paciente.objects.filter(
+            usuario=usuario,
+            fecha_registro__date__gte=inicio_semana
+        ).count()
+
+        # Eventos recientes (últimos 5)
+        eventos_recientes = EventoClinico.objects.filter(
+            historial__paciente__usuario=usuario
+        ).select_related(
+            'historial__paciente'
+        ).order_by('-fecha')[:5].values(
+            'id', 'tipo', 'fecha',
+            'historial__paciente__nombre',
+            'diagnostico'
+        )
+
+        # Diagnósticos más frecuentes (top 5)
+        diagnosticos_frecuentes = ResultadoIA.objects.filter(
+            paciente__usuario=usuario
+        ).values('diagnostico_predicho').annotate(
+            total=Count('id')
+        ).order_by('-total')[:5]
+
+        return Response({
+            'resumen': {
+                'total_pacientes': total_pacientes,
+                'total_diagnosticos': total_diagnosticos,
+                'pendientes': pendientes,
+            },
+            'semana': {
+                'diagnosticos': diagnosticos_semana,
+                'pacientes_nuevos': pacientes_semana,
+            },
+            'actividad_reciente': list(eventos_recientes),
+            'diagnosticos_frecuentes': list(diagnosticos_frecuentes),
+        })
 
 
 class RegistroAccesoListView(generics.ListAPIView):
