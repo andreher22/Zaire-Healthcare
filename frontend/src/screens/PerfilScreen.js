@@ -3,19 +3,40 @@
  * Pantalla de perfil del usuario con edición de nombre.
  * Muestra avatar grande, rol, fecha de registro, y formulario de edición.
  */
-import React, { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, Alert, useWindowDimensions } from 'react-native';
+import React, { useState, useEffect, useRef, useContext } from 'react';
+import { View, ScrollView, StyleSheet, Alert, useWindowDimensions, Animated, TouchableOpacity } from 'react-native';
 import { Text, TextInput, Button, Surface, Divider } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { colors } from '../constants/colors';
+import { useToast } from '../components/ToastContext';
 import DashboardService from '../services/DashboardService';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { DesktopNavContext } from '../navigation/MainNavigator';
 
 const PerfilScreen = ({ navigation }) => {
     const { user } = useAuth();
     const { width } = useWindowDimensions();
     const isDesktop = width > 768;
+    const { showToast } = useToast();
+    const { navigateToTab } = useContext(DesktopNavContext);
+
+    const handleBack = () => {
+        if (isDesktop) {
+            navigateToTab('Inicio');
+        } else {
+            navigation.goBack();
+        }
+    };
+
+
+
+    // ── Animación de entrada: fade + scale ──
+    const _fadeAnim  = useRef(new Animated.Value(0)).current;
+    useEffect(() => {
+        Animated.timing(_fadeAnim, { toValue: 1, duration: 350, useNativeDriver: false }).start();
+    }, []);
+
 
     const [perfil, setPerfil] = useState(null);
     const [nombre, setNombre] = useState('');
@@ -43,7 +64,7 @@ const PerfilScreen = ({ navigation }) => {
     /** Guardar cambios del perfil. */
     const handleSave = async () => {
         if (nombre.trim().length < 3) {
-            Alert.alert('Error', 'El nombre debe tener al menos 3 caracteres.');
+            showToast('El nombre debe tener al menos 3 caracteres.', 'error');
             return;
         }
         setSaving(true);
@@ -51,9 +72,9 @@ const PerfilScreen = ({ navigation }) => {
             const data = await DashboardService.updatePerfil({ nombre: nombre.trim() });
             setPerfil(data.usuario);
             setEditing(false);
-            Alert.alert('Éxito', 'Perfil actualizado correctamente.');
+            showToast('Perfil actualizado correctamente.', 'success');
         } catch (error) {
-            Alert.alert('Error', 'No se pudo actualizar el perfil.');
+            showToast('No se pudo actualizar el perfil.', 'error');
         } finally {
             setSaving(false);
         }
@@ -78,17 +99,39 @@ const PerfilScreen = ({ navigation }) => {
     if (loading) return <LoadingSpinner message="Cargando perfil..." />;
 
     return (
+        <Animated.View style={[styles.screenAnim, { opacity: _fadeAnim }]}>
         <ScrollView style={styles.container}>
             <View style={[styles.content, isDesktop && styles.contentDesktop]}>
-                {/* Avatar grande */}
-                <View style={styles.avatarSection}>
-                    <View style={styles.avatarLarge}>
-                        <Text style={styles.avatarTextLarge}>{getInitials(perfil?.nombre)}</Text>
+
+                {/* ── HEADER con avatar integrado ── */}
+                <View style={styles.headerBand}>
+                    {/* Ondas decorativas */}
+                    {[0,1,2,3,4].map(i => (
+                        <View key={i} style={[styles.headerWave, {
+                            top: -6 + i * 24,
+                            transform: [{ scaleX: i % 2 === 0 ? 1 : -1 }],
+                            opacity: 0.08 - i * 0.01,
+                        }]} pointerEvents="none" />
+                    ))}
+                    {/* Ícono decorativo fondo */}
+                    <View style={styles.headerBgIcon} pointerEvents="none">
+                        <MaterialCommunityIcons name="account-circle" size={130} color={colors.cornsilk} />
                     </View>
-                    <Text style={styles.name}>{perfil?.nombre}</Text>
-                    <View style={styles.rolBadge}>
-                        <MaterialCommunityIcons name="shield-check" size={16} color={colors.darkOliveGreen} />
-                        <Text style={styles.rolText}>{getRolLabel(perfil?.rol)}</Text>
+                    {/* Botón regreso */}
+                    <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
+                        <MaterialCommunityIcons name="arrow-left" size={20} color={colors.cornsilk} />
+                        <Text style={styles.backLabel}>Inicio</Text>
+                    </TouchableOpacity>
+                    {/* Avatar + nombre dentro del header */}
+                    <View style={styles.avatarSection}>
+                        <View style={styles.avatarLarge}>
+                            <Text style={styles.avatarTextLarge}>{getInitials(perfil?.nombre)}</Text>
+                        </View>
+                        <Text style={styles.name}>{perfil?.nombre}</Text>
+                        <View style={styles.rolBadge}>
+                            <MaterialCommunityIcons name="shield-check" size={14} color={colors.cornsilk} />
+                            <Text style={styles.rolText}>{getRolLabel(perfil?.rol)}</Text>
+                        </View>
                     </View>
                 </View>
 
@@ -167,13 +210,16 @@ const PerfilScreen = ({ navigation }) => {
                 </Surface>
             </View>
         </ScrollView>
+        </Animated.View>
     );
 };
 
 /** Fila de información reutilizable. */
 const InfoRow = ({ icon, label, value }) => (
     <View style={infoStyles.row}>
-        <MaterialCommunityIcons name={icon} size={22} color={colors.fawn} style={infoStyles.icon} />
+        <View style={infoStyles.iconBox}>
+            <MaterialCommunityIcons name={icon} size={20} color={colors.darkOliveGreen} />
+        </View>
         <View style={infoStyles.textContainer}>
             <Text style={infoStyles.label}>{label}</Text>
             <Text style={infoStyles.value}>{value}</Text>
@@ -185,17 +231,28 @@ const infoStyles = StyleSheet.create({
     row: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 12,
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.cornsilk,
     },
-    icon: {
+    iconBox: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: colors.darkOliveGreen + '12',
+        justifyContent: 'center',
+        alignItems: 'center',
         marginRight: 14,
     },
     textContainer: {
         flex: 1,
     },
     label: {
-        fontSize: 12,
+        fontSize: 11,
         color: colors.darkGray,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        fontWeight: '600',
     },
     value: {
         fontSize: 15,
@@ -206,6 +263,10 @@ const infoStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
+    screenAnim: {
+        flex: 1,
+        overflow: 'hidden',
+    },
     container: {
         flex: 1,
         backgroundColor: colors.cornsilk,
@@ -214,6 +275,45 @@ const styles = StyleSheet.create({
         padding: 16,
         paddingBottom: 40,
     },
+    // ── Header band con avatar ──
+    headerBand: {
+        backgroundColor: colors.kombuGreen,
+        borderRadius: 20,
+        marginBottom: 20,
+        overflow: 'hidden',
+        position: 'relative',
+        paddingBottom: 28,
+    },
+    headerWave: {
+        position: 'absolute',
+        left: -30,
+        right: -30,
+        height: 28,
+        borderRadius: 999,
+        borderWidth: 1.5,
+        borderColor: colors.cornsilk,
+        backgroundColor: 'transparent',
+    },
+    headerBgIcon: {
+        position: 'absolute',
+        right: -20,
+        top: -10,
+        opacity: 0.06,
+    },
+    backBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingTop: 16,
+        paddingHorizontal: 20,
+        paddingBottom: 8,
+        alignSelf: 'flex-start',
+    },
+    backLabel: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: colors.cornsilk + 'CC',
+        marginLeft: 6,
+    },
     contentDesktop: {
         maxWidth: 600,
         alignSelf: 'center',
@@ -221,16 +321,21 @@ const styles = StyleSheet.create({
     },
     avatarSection: {
         alignItems: 'center',
-        paddingVertical: 30,
+        paddingTop: 8,
+        paddingBottom: 4,
+        position: 'relative',
+        zIndex: 1,
     },
     avatarLarge: {
         width: 90,
         height: 90,
         borderRadius: 45,
-        backgroundColor: colors.darkOliveGreen,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        borderWidth: 3,
+        borderColor: 'rgba(255,255,255,0.3)',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 14,
+        marginBottom: 12,
     },
     avatarTextLarge: {
         color: colors.white,
@@ -240,12 +345,12 @@ const styles = StyleSheet.create({
     name: {
         fontSize: 22,
         fontWeight: '700',
-        color: colors.kombuGreen,
+        color: colors.cornsilk,
     },
     rolBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.darkOliveGreen + '15',
+        backgroundColor: 'rgba(255,255,255,0.12)',
         paddingHorizontal: 14,
         paddingVertical: 6,
         borderRadius: 20,
@@ -253,7 +358,7 @@ const styles = StyleSheet.create({
     },
     rolText: {
         fontSize: 13,
-        color: colors.darkOliveGreen,
+        color: colors.cornsilk,
         fontWeight: '600',
         marginLeft: 6,
     },
@@ -262,12 +367,20 @@ const styles = StyleSheet.create({
         backgroundColor: colors.white,
         padding: 20,
         marginBottom: 16,
+        elevation: 2,
+        shadowColor: colors.kombuGreen,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
     },
     cardTitle: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '700',
         color: colors.kombuGreen,
         marginBottom: 4,
+        paddingLeft: 10,
+        borderLeftWidth: 3,
+        borderLeftColor: colors.darkOliveGreen,
     },
     divider: {
         marginVertical: 12,

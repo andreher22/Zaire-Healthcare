@@ -8,24 +8,45 @@
  *
  * Basado en el boceto: "Con gráficas en caso de cada min necesaria → Reportes"
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback , useRef } from 'react';
 import {
     View, ScrollView, StyleSheet, Alert, Modal as RNModal,
-    useWindowDimensions, TouchableOpacity, RefreshControl, TextInput as RNTextInput
+    useWindowDimensions, TouchableOpacity, RefreshControl,
+    TextInput as RNTextInput, Animated,
 } from 'react-native';
 import {
     Text, Surface, Button, Divider
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
+import { useToast } from '../components/ToastContext';
 import PacientesService from '../services/PacientesService';
 import HistorialService from '../services/HistorialService';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
 
-const HistorialScreen = ({ route }) => {
+const HistorialScreen = ({ route, tabParams }) => {
     const { width } = useWindowDimensions();
     const isDesktop = width > 768;
+    const { showToast } = useToast();
+
+
+
+    // ── Animación de entrada: fade ──
+    const _fadeAnim  = useRef(new Animated.Value(0)).current;
+    useEffect(() => {
+        Animated.timing(_fadeAnim, { toValue: 1, duration: 350, useNativeDriver: false }).start();
+    }, []);
+
+    // ── Animación al seleccionar/deseleccionar paciente ──
+    const historialFade = useRef(new Animated.Value(1)).current;
+    const goToHistorial = (callback) => {
+        Animated.timing(historialFade, { toValue: 0, duration: 150, useNativeDriver: false }).start(() => {
+            callback && callback();
+            Animated.timing(historialFade, { toValue: 1, duration: 280, useNativeDriver: false }).start();
+        });
+    };
+
 
     const [pacientes, setPacientes] = useState([]);
     const [selectedPaciente, setSelectedPaciente] = useState(null);
@@ -47,8 +68,8 @@ const HistorialScreen = ({ route }) => {
 
     useEffect(() => {
         loadPacientes();
-        // Si viene pacienteId desde navegación
-        const pacienteId = route?.params?.pacienteId;
+        // Recibir pacienteId desde navegación normal o desde acceso desktop
+        const pacienteId = route?.params?.pacienteId || tabParams?.pacienteId;
         if (pacienteId) {
             loadHistorialDirecto(pacienteId);
         }
@@ -85,16 +106,18 @@ const HistorialScreen = ({ route }) => {
 
     /** Seleccionar paciente y cargar su historial. */
     const handleSelectPaciente = async (paciente) => {
-        setSelectedPaciente(paciente);
-        setLoading(true);
-        try {
-            const data = await HistorialService.getHistorial(paciente.id);
-            setHistorial(data);
-        } catch (error) {
-            setHistorial(null);
-        } finally {
-            setLoading(false);
-        }
+        goToHistorial(async () => {
+            setSelectedPaciente(paciente);
+            setLoading(true);
+            try {
+                const data = await HistorialService.getHistorial(paciente.id);
+                setHistorial(data);
+            } catch (error) {
+                setHistorial(null);
+            } finally {
+                setLoading(false);
+            }
+        });
     };
 
     /** Refresh historial. */
@@ -108,11 +131,11 @@ const HistorialScreen = ({ route }) => {
     /** Guardar nuevo evento clínico. */
     const handleSaveEvento = async () => {
         if (!eventoForm.descripcion.trim()) {
-            Alert.alert('Error', 'La descripción es obligatoria.');
+            showToast('La descripción es obligatoria.', 'error');
             return;
         }
         if (!historial?.id) {
-            Alert.alert('Error', 'No hay historial activo para este paciente.');
+            showToast('No hay historial activo para este paciente.', 'warning');
             return;
         }
         setSavingEvento(true);
@@ -126,9 +149,9 @@ const HistorialScreen = ({ route }) => {
             // Recargar historial
             const data = await HistorialService.getHistorial(selectedPaciente.id);
             setHistorial(data);
-            Alert.alert('Éxito', 'Evento clínico registrado correctamente.');
+            showToast('Evento clínico registrado correctamente.', 'success');
         } catch (error) {
-            Alert.alert('Error', 'No se pudo guardar el evento.');
+            showToast('No se pudo guardar el evento.', 'error');
         } finally {
             setSavingEvento(false);
         }
@@ -184,11 +207,36 @@ const HistorialScreen = ({ route }) => {
     const totalEmergencias = eventos.filter(e => e.tipo === 'emergencia').length;
 
     return (
-        <View style={styles.container}>
+        <Animated.View style={[styles.container, { opacity: _fadeAnim }]}>
             <ScrollView
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.darkOliveGreen]} />}
             >
                 <View style={[styles.content, isDesktop && styles.contentDesktop]}>
+                    {/* ── HEADER con ondas ── */}
+                    <View style={styles.headerBand}>
+                        {/* 4 ondas usando View con borderRadius asimétrico */}
+                        <View style={[styles.headerWave, { top: -8, opacity: 0.09 }]} pointerEvents="none" />
+                        <View style={[styles.headerWave, { top: 16, opacity: 0.07, transform: [{ scaleX: -1 }] }]} pointerEvents="none" />
+                        <View style={[styles.headerWave, { top: 40, opacity: 0.06 }]} pointerEvents="none" />
+                        <View style={[styles.headerWave, { top: 64, opacity: 0.04, transform: [{ scaleX: -1 }] }]} pointerEvents="none" />
+                        <View style={[styles.headerWave, { top: 88, opacity: 0.03 }]} pointerEvents="none" />
+                        {/* Icono decorativo */}
+                        <View style={styles.headerBigIcon} pointerEvents="none">
+                            <MaterialCommunityIcons name="clipboard-text-clock" size={90} color={colors.cornsilk} />
+                        </View>
+                        <View style={styles.header}>
+                            <View style={styles.headerLeft}>
+                                <View style={styles.headerIconBox}>
+                                    <MaterialCommunityIcons name="clipboard-text-clock" size={24} color={colors.cornsilk} />
+                                </View>
+                                <View style={{ marginLeft: 12 }}>
+                                    <Text style={styles.headerTitle}>Historial Clínico</Text>
+                                    <Text style={styles.headerSub}>Registro de eventos del paciente</Text>
+                                </View>
+                            </View>
+                        </View>
+                    </View>
+
                     {isDesktop ? (
                         // DESKTOP: Sidebar izquierda con pacientes + Panel derecho con historial
                         <View style={styles.desktopGrid}>
@@ -224,19 +272,19 @@ const HistorialScreen = ({ route }) => {
                                     ))}
                                 </ScrollView>
                             </View>
-                            <View style={styles.mainPanel}>
+                            <Animated.View style={[styles.mainPanel, { opacity: historialFade }]}>
                                 {renderHistorialContent()}
-                            </View>
+                            </Animated.View>
                         </View>
                     ) : (
                         // MOBILE
-                        <>
+                        <Animated.View style={{ flex: 1, opacity: historialFade }}>
                             {!selectedPaciente ? (
                                 renderPacienteSelector()
                             ) : (
                                 renderHistorialContent()
                             )}
-                        </>
+                        </Animated.View>
                     )}
                 </View>
             </ScrollView>
@@ -315,7 +363,7 @@ const HistorialScreen = ({ route }) => {
                     </View>
                 </View>
             </RNModal>
-        </View>
+        </Animated.View>
     );
 
     /** Render selector de paciente (móvil). */
@@ -376,7 +424,7 @@ const HistorialScreen = ({ route }) => {
                             <MaterialCommunityIcons name="file-pdf-box" size={24} color={colors.liver} />
                         </TouchableOpacity>
                         {!isDesktop && (
-                            <TouchableOpacity onPress={() => setSelectedPaciente(null)} style={styles.actionBtn}>
+                            <TouchableOpacity onPress={() => goToHistorial(() => setSelectedPaciente(null))} style={styles.actionBtn}>
                                 <MaterialCommunityIcons name="arrow-left" size={24} color={colors.darkGray} />
                             </TouchableOpacity>
                         )}
@@ -472,9 +520,14 @@ const HistorialScreen = ({ route }) => {
 };
 
 const styles = StyleSheet.create({
+    screenAnim: {
+        flex: 1,
+        overflow: 'hidden',
+    },
     container: {
         flex: 1,
         backgroundColor: colors.cornsilk,
+        overflow: 'hidden',
     },
     content: {
         flex: 1,
@@ -485,6 +538,67 @@ const styles = StyleSheet.create({
         maxWidth: 1200,
         alignSelf: 'center',
         width: '100%',
+    },
+
+    // ── Header band ──
+    headerBand: {
+        backgroundColor: colors.kombuGreen,
+        borderRadius: 20,
+        marginBottom: 16,
+        overflow: 'hidden',
+        position: 'relative',
+        minHeight: 110,
+    },
+    // Onda — elipse muy achatada crea curva suave de extremo a extremo
+    headerWave: {
+        position: 'absolute',
+        left: -30,
+        right: -30,
+        height: 28,
+        borderRadius: 999,
+        borderWidth: 1.5,
+        borderColor: colors.cornsilk,
+        backgroundColor: 'transparent',
+    },
+    // Icono decorativo grande — derecha
+    headerBigIcon: {
+        position: 'absolute',
+        right: 12,
+        top: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        opacity: 0.09,
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 20,
+        position: 'relative',
+        zIndex: 1,
+    },
+    headerLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    headerIconBox: {
+        width: 46,
+        height: 46,
+        borderRadius: 14,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    headerTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: colors.cornsilk,
+    },
+    headerSub: {
+        fontSize: 13,
+        color: colors.cornsilk + 'BB',
+        marginTop: 1,
     },
 
     // Desktop layout
@@ -498,12 +612,20 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         padding: 14,
         marginRight: 16,
+        elevation: 2,
+        shadowColor: colors.kombuGreen,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
     },
     sidebarTitle: {
         fontSize: 16,
         fontWeight: '700',
         color: colors.kombuGreen,
         marginBottom: 12,
+        paddingLeft: 8,
+        borderLeftWidth: 3,
+        borderLeftColor: colors.darkOliveGreen,
     },
     mainPanel: {
         flex: 1,
@@ -535,9 +657,12 @@ const styles = StyleSheet.create({
         padding: 10,
         borderRadius: 12,
         marginBottom: 4,
+        borderLeftWidth: 3,
+        borderLeftColor: 'transparent',
     },
     pacienteItemActive: {
         backgroundColor: colors.darkOliveGreen + '12',
+        borderLeftColor: colors.darkOliveGreen,
     },
     pacienteCard: {
         flexDirection: 'row',
@@ -621,6 +746,13 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         backgroundColor: colors.white,
         marginHorizontal: 4,
+        elevation: 2,
+        shadowColor: colors.kombuGreen,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.07,
+        shadowRadius: 4,
+        borderTopWidth: 3,
+        borderTopColor: colors.darkOliveGreen,
     },
     miniStatValue: {
         fontSize: 22,
@@ -639,6 +771,13 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         padding: 14,
         marginBottom: 16,
+        borderLeftWidth: 4,
+        borderLeftColor: colors.liver,
+        elevation: 1,
+        shadowColor: colors.kombuGreen,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 3,
     },
     infoCardHeader: {
         flexDirection: 'row',
@@ -668,6 +807,9 @@ const styles = StyleSheet.create({
         fontSize: 17,
         fontWeight: '700',
         color: colors.kombuGreen,
+        paddingLeft: 10,
+        borderLeftWidth: 3,
+        borderLeftColor: colors.fawn,
     },
     timelineItem: {
         flexDirection: 'row',
@@ -678,17 +820,22 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     timelineDot: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         justifyContent: 'center',
         alignItems: 'center',
         zIndex: 1,
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 3,
     },
     timelineConnector: {
         width: 2,
         flex: 1,
-        backgroundColor: colors.fawn + '40',
+        backgroundColor: colors.darkOliveGreen + '30',
         marginTop: -2,
     },
     eventCard: {
@@ -698,6 +845,11 @@ const styles = StyleSheet.create({
         padding: 14,
         marginLeft: 10,
         marginBottom: 8,
+        elevation: 2,
+        shadowColor: colors.kombuGreen,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.07,
+        shadowRadius: 4,
     },
     eventHeader: {
         flexDirection: 'row',

@@ -6,8 +6,8 @@
  * Basado en el boceto del usuario: avatar arriba, resumen del día con stats,
  * actividad reciente (últimas consultas), y accesos rápidos a módulos.
  */
-import React, { useState, useCallback, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, useWindowDimensions, RefreshControl, TouchableOpacity } from 'react-native';
+import React, { useState, useCallback, useEffect, useRef, useContext } from 'react';
+import { View, ScrollView, StyleSheet, useWindowDimensions, RefreshControl, TouchableOpacity, Animated } from 'react-native';
 import { Text, Surface, Button, Divider, Badge } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -16,15 +16,28 @@ import { traducirDiagnostico } from '../constants/traducciones';
 import StatsCard from '../components/StatsCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import DashboardService from '../services/DashboardService';
+import { DesktopNavContext } from '../navigation/MainNavigator';
 
 const HomeScreen = ({ navigation }) => {
     const { user, logout } = useAuth();
     const { width } = useWindowDimensions();
     const isDesktop = width > 768;
+    const { navigateToTab } = useContext(DesktopNavContext);
 
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+
+    // ── Animación de entrada: fade + scale ──
+    const _fadeAnim  = useRef(new Animated.Value(0)).current;
+    const _scaleAnim = useRef(new Animated.Value(0.96)).current;
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(_fadeAnim,  { toValue: 1, duration: 350, useNativeDriver: false }),
+            Animated.spring(_scaleAnim, { toValue: 1, friction: 8, tension: 100, useNativeDriver: false }),
+        ]).start();
+    }, []);
+
 
     /** Cargar estadísticas del dashboard al montar. */
     const loadStats = useCallback(async () => {
@@ -102,29 +115,35 @@ const HomeScreen = ({ navigation }) => {
     const frecuentes = stats?.diagnosticos_frecuentes || [];
 
     return (
+        <Animated.View style={[styles.screenAnim, { opacity: _fadeAnim, transform: [{ scale: _scaleAnim }] }]}>
         <ScrollView
             style={styles.container}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.darkOliveGreen]} />}
         >
-            <View style={[styles.content, isDesktop && styles.contentDesktop]}>
+        <View style={[styles.content, isDesktop && styles.contentDesktop]}>
 
-                {/* ===== HEADER CON AVATAR ===== */}
-                <View style={styles.header}>
-                    <View style={styles.headerLeft}>
-                        <TouchableOpacity
-                            style={styles.avatar}
-                            onPress={() => navigation.navigate('Perfil')}
-                        >
-                            <Text style={styles.avatarText}>{getInitials(user?.nombre)}</Text>
-                        </TouchableOpacity>
-                        <View style={styles.headerInfo}>
-                            <Text style={styles.greeting}>{getGreeting()}</Text>
-                            <Text style={styles.userName}>{user?.nombre || 'Doctor'}</Text>
+                {/* ===== HEADER CON BANDA VERDE ===== */}
+                <View style={styles.headerBand}>
+                    {/* Burbujas decorativas del header */}
+                    <View style={styles.headerBubble1} pointerEvents="none" />
+                    <View style={styles.headerBubble2} pointerEvents="none" />
+                    <View style={styles.header}>
+                        <View style={styles.headerLeft}>
+                            <TouchableOpacity
+                                style={styles.avatar}
+                                onPress={() => isDesktop ? navigateToTab('Perfil') : navigation.navigate('Perfil')}
+                            >
+                                <Text style={styles.avatarText}>{getInitials(user?.nombre)}</Text>
+                            </TouchableOpacity>
+                            <View style={styles.headerInfo}>
+                                <Text style={styles.greeting}>{getGreeting()}</Text>
+                                <Text style={styles.userName}>{user?.nombre || 'Doctor'}</Text>
+                            </View>
                         </View>
+                        <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
+                            <MaterialCommunityIcons name="logout" size={22} color={colors.cornsilk} />
+                        </TouchableOpacity>
                     </View>
-                    <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
-                        <MaterialCommunityIcons name="logout" size={22} color={colors.liver} />
-                    </TouchableOpacity>
                 </View>
 
                 {/* ===== LAYOUT RESPONSIVE ===== */}
@@ -145,24 +164,27 @@ const HomeScreen = ({ navigation }) => {
                         <View style={styles.quickActions}>
                             <TouchableOpacity
                                 style={[styles.quickBtn, { backgroundColor: colors.darkOliveGreen }]}
-                                onPress={() => navigation.navigate('PacientesTab', { screen: 'NuevoPaciente' })}
+                                onPress={() => isDesktop ? navigateToTab('PacientesTab', { initialRoute: 'NuevoPaciente' }) : navigation.navigate('PacientesTab', { screen: 'NuevoPaciente' })}
                             >
+                                <View style={styles.quickBtnBubble} pointerEvents="none" />
                                 <MaterialCommunityIcons name="account-plus" size={24} color={colors.white} />
                                 <Text style={styles.quickBtnText}>Nuevo Paciente</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
                                 style={[styles.quickBtn, { backgroundColor: colors.liver }]}
-                                onPress={() => navigation.navigate('Diagnostico')}
+                                onPress={() => isDesktop ? navigateToTab('Diagnostico') : navigation.navigate('Diagnostico')}
                             >
+                                <View style={styles.quickBtnBubble} pointerEvents="none" />
                                 <MaterialCommunityIcons name="stethoscope" size={24} color={colors.white} />
                                 <Text style={styles.quickBtnText}>Diagnóstico IA</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
                                 style={[styles.quickBtn, { backgroundColor: colors.fawn }]}
-                                onPress={() => navigation.navigate('Historial')}
+                                onPress={() => isDesktop ? navigateToTab('Historial') : navigation.navigate('Historial')}
                             >
+                                <View style={styles.quickBtnBubble} pointerEvents="none" />
                                 <MaterialCommunityIcons name="chart-timeline-variant" size={24} color={colors.white} />
                                 <Text style={styles.quickBtnText}>Historial</Text>
                             </TouchableOpacity>
@@ -321,10 +343,14 @@ const HomeScreen = ({ navigation }) => {
                 </View>
             </View>
         </ScrollView>
+        </Animated.View>
     );
 };
 
 const styles = StyleSheet.create({
+    screenAnim: {
+        flex: 1,
+    },
     container: {
         flex: 1,
         backgroundColor: colors.cornsilk,
@@ -339,13 +365,38 @@ const styles = StyleSheet.create({
         width: '100%',
     },
 
-    // Header
+    // Header band
+    headerBand: {
+        backgroundColor: colors.kombuGreen,
+        borderRadius: 20,
+        marginBottom: 24,
+        overflow: 'hidden',
+        position: 'relative',
+    },
+    headerBubble1: {
+        position: 'absolute',
+        width: 180,
+        height: 180,
+        borderRadius: 90,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        top: -70,
+        right: -50,
+    },
+    headerBubble2: {
+        position: 'absolute',
+        width: 110,
+        height: 110,
+        borderRadius: 55,
+        backgroundColor: 'rgba(221,161,94,0.12)',
+        bottom: -40,
+        left: 20,
+    },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 24,
-        paddingTop: 8,
+        paddingHorizontal: 20,
+        paddingVertical: 20,
     },
     headerLeft: {
         flexDirection: 'row',
@@ -355,9 +406,11 @@ const styles = StyleSheet.create({
         width: 52,
         height: 52,
         borderRadius: 26,
-        backgroundColor: colors.darkOliveGreen,
+        backgroundColor: 'rgba(255,255,255,0.2)',
         justifyContent: 'center',
         alignItems: 'center',
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,0.3)',
     },
     avatarText: {
         color: colors.white,
@@ -369,17 +422,17 @@ const styles = StyleSheet.create({
     },
     greeting: {
         fontSize: 13,
-        color: colors.darkGray,
+        color: colors.cornsilk + 'BB',
     },
     userName: {
         fontSize: 18,
         fontWeight: '700',
-        color: colors.kombuGreen,
+        color: colors.cornsilk,
     },
     logoutBtn: {
         padding: 10,
         borderRadius: 12,
-        backgroundColor: colors.liver + '12',
+        backgroundColor: 'rgba(255,255,255,0.1)',
     },
 
     // Sections
@@ -389,6 +442,9 @@ const styles = StyleSheet.create({
         color: colors.kombuGreen,
         marginTop: 20,
         marginBottom: 12,
+        paddingLeft: 10,
+        borderLeftWidth: 3,
+        borderLeftColor: colors.fawn,
     },
     statsRow: {
         flexDirection: 'row',
@@ -403,17 +459,33 @@ const styles = StyleSheet.create({
     quickBtn: {
         flex: 1,
         marginHorizontal: 4,
-        paddingVertical: 18,
+        paddingVertical: 20,
         paddingHorizontal: 8,
-        borderRadius: 16,
+        borderRadius: 18,
         alignItems: 'center',
         justifyContent: 'center',
+        overflow: 'hidden',
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+        position: 'relative',
+    },
+    quickBtnBubble: {
+        position: 'absolute',
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        top: -25,
+        right: -20,
     },
     quickBtnText: {
         color: colors.white,
         fontSize: 11,
-        fontWeight: '600',
-        marginTop: 6,
+        fontWeight: '700',
+        marginTop: 8,
         textAlign: 'center',
     },
 
@@ -422,11 +494,18 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         backgroundColor: colors.white,
         overflow: 'hidden',
+        elevation: 2,
+        shadowColor: colors.kombuGreen,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
     },
     activityItem: {
         flexDirection: 'row',
         alignItems: 'center',
         padding: 14,
+        borderLeftWidth: 3,
+        borderLeftColor: colors.darkOliveGreen + '40',
     },
     activityIcon: {
         width: 40,
@@ -547,11 +626,11 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         padding: 18,
         marginBottom: 20,
-        elevation: 1,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 3,
+        elevation: 2,
+        shadowColor: colors.kombuGreen,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
     },
     chartHeader: {
         flexDirection: 'row',

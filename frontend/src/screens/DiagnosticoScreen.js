@@ -6,19 +6,39 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
     View, ScrollView, StyleSheet, Alert,
-    useWindowDimensions, TouchableOpacity, TextInput as RNTextInput, Animated
+    useWindowDimensions, TouchableOpacity, TextInput as RNTextInput, Animated,
 } from 'react-native';
 import { Text, Button, Surface, Divider } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
+import { useToast } from '../components/ToastContext';
 import { traducirSintoma, traducirDiagnostico, obtenerAcciones, getColorUrgencia, getLabelUrgencia } from '../constants/traducciones';
 import DiagnosticoIAService from '../services/DiagnosticoIAService';
 import PacientesService from '../services/PacientesService';
 import LoadingSpinner from '../components/LoadingSpinner';
 
-const DiagnosticoScreen = ({ route, navigation }) => {
+const DiagnosticoScreen = ({ route, navigation, tabParams }) => {
     const { width } = useWindowDimensions();
     const isDesktop = width > 768;
+    const { showToast } = useToast();
+
+
+
+    // ── Animación de entrada: fade ──
+    const _fadeAnim  = useRef(new Animated.Value(0)).current;
+    useEffect(() => {
+        Animated.timing(_fadeAnim, { toValue: 1, duration: 350, useNativeDriver: false }).start();
+    }, []);
+
+    // ── Animación entre steps ──
+    const stepFade = useRef(new Animated.Value(1)).current;
+    const goToStep = (newStep, callback) => {
+        Animated.timing(stepFade, { toValue: 0, duration: 150, useNativeDriver: false }).start(() => {
+            callback && callback();
+            Animated.timing(stepFade, { toValue: 1, duration: 250, useNativeDriver: false }).start();
+        });
+    };
+
     const scrollRef = useRef(null);
 
     // Flow state
@@ -41,7 +61,7 @@ const DiagnosticoScreen = ({ route, navigation }) => {
 
     // If navigated with pacienteId, skip to step 2
     useEffect(() => {
-        const pacienteId = route?.params?.pacienteId;
+        const pacienteId = route?.params?.pacienteId || tabParams?.pacienteId;
         if (pacienteId) {
             loadPacienteDirecto(pacienteId);
         } else {
@@ -62,8 +82,7 @@ const DiagnosticoScreen = ({ route, navigation }) => {
         try {
             const data = await PacientesService.getPaciente(id);
             setSelectedPaciente(data);
-            setStep(2);
-            loadSintomas();
+            goToStep(2, () => { setStep(2); loadSintomas(); });
         } catch (error) {
             loadPacientes();
         }
@@ -83,8 +102,7 @@ const DiagnosticoScreen = ({ route, navigation }) => {
 
     const handleSelectPaciente = (paciente) => {
         setSelectedPaciente(paciente);
-        setStep(2);
-        loadSintomas();
+        goToStep(2, () => { setStep(2); loadSintomas(); });
         scrollRef.current?.scrollTo({ y: 0, animated: true });
     };
 
@@ -96,7 +114,7 @@ const DiagnosticoScreen = ({ route, navigation }) => {
 
     const handleDiagnosticar = async () => {
         if (selectedSintomas.length < 2) {
-            Alert.alert('Atención', 'Seleccione al menos 2 síntomas para un diagnóstico más preciso.');
+            showToast('Seleccione al menos 2 síntomas.', 'warning');
             return;
         }
         setLoading(true);
@@ -108,10 +126,10 @@ const DiagnosticoScreen = ({ route, navigation }) => {
             // Backend retorna { mensaje, resultado: { diagnostico_predicho, confianza, ... } }
             const res = data.resultado || data;
             setResultado(res);
-            setStep(3);
+            goToStep(3, () => setStep(3));
             scrollRef.current?.scrollTo({ y: 0, animated: true });
         } catch (error) {
-            Alert.alert('Error', 'No se pudo procesar el diagnóstico. Intente nuevamente.');
+            showToast('No se pudo procesar el diagnóstico.', 'error');
             console.error(error);
         } finally {
             setLoading(false);
@@ -119,12 +137,14 @@ const DiagnosticoScreen = ({ route, navigation }) => {
     };
 
     const handleNuevo = () => {
-        setStep(1);
-        setSelectedPaciente(null);
-        setSelectedSintomas([]);
-        setResultado(null);
-        setSintomaSearch('');
-        setPacienteSearch('');
+        goToStep(1, () => {
+            setStep(1);
+            setSelectedPaciente(null);
+            setSelectedSintomas([]);
+            setResultado(null);
+            setSintomaSearch('');
+            setPacienteSearch('');
+        });
     };
 
     const formatSintoma = (s) => traducirSintoma(s);
@@ -141,25 +161,42 @@ const DiagnosticoScreen = ({ route, navigation }) => {
     });
 
     return (
-        <View style={styles.container}>
+        <Animated.View style={[styles.container, { opacity: _fadeAnim }]}>
             <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent}>
                 <View style={[styles.content, isDesktop && styles.contentDesktop]}>
 
                     {/* Header */}
-                    <View style={styles.header}>
-                        <View style={styles.headerLeft}>
-                            <MaterialCommunityIcons name="brain" size={28} color={colors.darkOliveGreen} />
-                            <View style={{ marginLeft: 12 }}>
-                                <Text style={styles.headerTitle}>Diagnóstico con IA</Text>
-                                <Text style={styles.headerSub}>Asistente inteligente de apoyo clínico</Text>
-                            </View>
+                    <View style={styles.headerBand}>
+                        {/* Círculo fondo izquierda */}
+                        <View style={styles.headerCircleBL} pointerEvents="none" />
+                        {/* 3 anillos distribuidos por el header */}
+                        <View style={styles.headerRing1} pointerEvents="none" />
+                        <View style={styles.headerRing2} pointerEvents="none" />
+                        <View style={styles.headerRing3} pointerEvents="none" />
+                        {/* Icono decorativo derecha */}
+                        <View style={styles.headerBigIcon} pointerEvents="none">
+                            <MaterialCommunityIcons name="brain" size={90} color={colors.cornsilk} />
                         </View>
-                        {step > 1 && (
-                            <TouchableOpacity style={styles.newBtn} onPress={handleNuevo}>
-                                <MaterialCommunityIcons name="refresh" size={18} color={colors.darkOliveGreen} />
-                                <Text style={styles.newBtnText}>Nueva</Text>
-                            </TouchableOpacity>
-                        )}
+                        {/* Línea sutil inferior */}
+                        <View style={styles.headerBottomLine} pointerEvents="none" />
+                        {/* Contenido */}
+                        <View style={styles.header}>
+                            <View style={styles.headerLeft}>
+                                <View style={styles.headerIconBox}>
+                                    <MaterialCommunityIcons name="brain" size={26} color={colors.cornsilk} />
+                                </View>
+                                <View style={{ marginLeft: 12 }}>
+                                    <Text style={styles.headerTitle}>Diagnóstico con IA</Text>
+                                    <Text style={styles.headerSub}>Asistente inteligente de apoyo clínico</Text>
+                                </View>
+                            </View>
+                            {step > 1 && (
+                                <TouchableOpacity style={styles.newBtn} onPress={handleNuevo}>
+                                    <MaterialCommunityIcons name="refresh" size={18} color={colors.cornsilk} />
+                                    <Text style={styles.newBtnText}>Nueva</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
                     </View>
 
                     {/* Stepper */}
@@ -189,6 +226,7 @@ const DiagnosticoScreen = ({ route, navigation }) => {
                         ))}
                     </View>
 
+                    <Animated.View style={{ flex: 1, opacity: stepFade }}>
                     {/* ========== STEP 1: SELECT PATIENT ========== */}
                     {step === 1 && (
                         <View style={styles.stepContent}>
@@ -224,6 +262,7 @@ const DiagnosticoScreen = ({ route, navigation }) => {
                                             onPress={() => handleSelectPaciente(p)}
                                             activeOpacity={0.7}
                                         >
+                                            <View style={[styles.patientCardAccent, { backgroundColor: p.sexo === 'F' ? colors.fawn : colors.darkOliveGreen }]} />
                                             <View style={[styles.patientAvatar, { backgroundColor: p.sexo === 'F' ? colors.fawn + '20' : colors.darkOliveGreen + '15' }]}>
                                                 <MaterialCommunityIcons
                                                     name={p.sexo === 'F' ? 'face-woman' : 'face-man'}
@@ -252,7 +291,7 @@ const DiagnosticoScreen = ({ route, navigation }) => {
                             <View style={styles.patientBadge}>
                                 <MaterialCommunityIcons name="account-check" size={20} color={colors.darkOliveGreen} />
                                 <Text style={styles.patientBadgeText}>{selectedPaciente?.nombre}</Text>
-                                <TouchableOpacity onPress={() => setStep(1)}>
+                                <TouchableOpacity onPress={() => goToStep(1, () => setStep(1))}>
                                     <Text style={styles.changeLink}>Cambiar</Text>
                                 </TouchableOpacity>
                             </View>
@@ -270,8 +309,9 @@ const DiagnosticoScreen = ({ route, navigation }) => {
                                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                                         {selectedSintomas.map(s => (
                                             <TouchableOpacity key={s} style={styles.selectedChip} onPress={() => toggleSintoma(s)}>
+                                                <MaterialCommunityIcons name="check-circle" size={14} color={colors.cornsilk} style={{ marginRight: 4 }} />
                                                 <Text style={styles.selectedChipText}>{formatSintoma(s)}</Text>
-                                                <MaterialCommunityIcons name="close" size={14} color={colors.white} style={{ marginLeft: 4 }} />
+                                                <MaterialCommunityIcons name="close" size={12} color={colors.cornsilk + 'CC'} style={{ marginLeft: 6 }} />
                                             </TouchableOpacity>
                                         ))}
                                     </ScrollView>
@@ -329,6 +369,7 @@ const DiagnosticoScreen = ({ route, navigation }) => {
                                 disabled={loading || selectedSintomas.length < 2}
                                 activeOpacity={0.8}
                             >
+                                <View style={styles.diagnoseBtnBubble} pointerEvents="none" />
                                 <MaterialCommunityIcons name="brain" size={22} color={colors.white} />
                                 <Text style={styles.diagnoseBtnText}>
                                     {loading ? 'Analizando...' : `Diagnosticar (${selectedSintomas.length} síntomas)`}
@@ -365,9 +406,10 @@ const DiagnosticoScreen = ({ route, navigation }) => {
                             </View>
                         </View>
                     )}
+                    </Animated.View>
                 </View>
             </ScrollView>
-        </View>
+        </Animated.View>
     );
 };
 
@@ -508,9 +550,14 @@ const ResultView = ({ resultado, paciente, selectedSintomas, formatSintoma, onNu
 
 // ========== STYLES ==========
 const styles = StyleSheet.create({
+    screenAnim: {
+        flex: 1,
+        overflow: 'hidden',
+    },
     container: {
         flex: 1,
         backgroundColor: colors.cornsilk,
+        overflow: 'hidden',
     },
     scrollContent: {
         paddingBottom: 40,
@@ -525,40 +572,174 @@ const styles = StyleSheet.create({
         width: '100%',
     },
 
-    // Header
+    // Header band
+    headerBand: {
+        backgroundColor: colors.kombuGreen,
+        borderRadius: 20,
+        marginBottom: 20,
+        overflow: 'hidden',
+        position: 'relative',
+        minHeight: 110,
+    },
+    // Círculo sólido grande — fondo izquierda
+    headerCircleBL: {
+        position: 'absolute',
+        width: 160,
+        height: 160,
+        borderRadius: 80,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        left: -50,
+        bottom: -60,
+    },
+    // Anillo 1 — izquierda del centro
+    headerRing1: {
+        position: 'absolute',
+        width: 70,
+        height: 70,
+        borderRadius: 35,
+        borderWidth: 10,
+        borderColor: 'rgba(255,255,255,0.10)',
+        left: '25%',
+        top: '50%',
+        marginTop: -35,
+    },
+    // Anillo 2 — centro
+    headerRing2: {
+        position: 'absolute',
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        borderWidth: 12,
+        borderColor: 'rgba(255,255,255,0.07)',
+        left: '50%',
+        top: '50%',
+        marginTop: -40,
+        marginLeft: -40,
+    },
+    // Anillo 3 — derecha del centro
+    headerRing3: {
+        position: 'absolute',
+        width: 65,
+        height: 65,
+        borderRadius: 33,
+        borderWidth: 9,
+        borderColor: 'rgba(255,255,255,0.09)',
+        right: '20%',
+        top: '50%',
+        marginTop: -33,
+    },
+    // Icono decorativo derecha
+    headerBigIcon: {
+        position: 'absolute',
+        right: 18,
+        top: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        opacity: 0.13,
+    },
+    // Línea sutil inferior
+    headerBottomLine: {
+        position: 'absolute',
+        bottom: 0,
+        left: 20,
+        right: 20,
+        height: 1,
+        backgroundColor: 'rgba(255,255,255,0.10)',
+    },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 20,
+        paddingHorizontal: 22,
+        paddingVertical: 24,
+        position: 'relative',
+        zIndex: 1,
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 20,
+        position: 'relative',
+        zIndex: 1,
     },
     headerLeft: {
         flexDirection: 'row',
         alignItems: 'center',
     },
+    headerIconBox: {
+        width: 48,
+        height: 48,
+        borderRadius: 14,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     headerTitle: {
         fontSize: 20,
         fontWeight: '800',
-        color: colors.kombuGreen,
+        color: colors.cornsilk,
     },
     headerSub: {
         fontSize: 13,
-        color: colors.darkGray,
+        color: colors.cornsilk + 'BB',
         marginTop: 1,
     },
     newBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.darkOliveGreen + '12',
+        backgroundColor: 'rgba(255,255,255,0.15)',
         paddingHorizontal: 14,
         paddingVertical: 8,
         borderRadius: 20,
     },
     newBtnText: {
-        color: colors.darkOliveGreen,
+        color: colors.cornsilk,
         fontWeight: '600',
         fontSize: 13,
         marginLeft: 4,
+    },
+
+    // Patient card accent
+    patientCardAccent: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 3,
+        borderTopLeftRadius: 14,
+        borderTopRightRadius: 14,
+    },
+    // Síntoma chip mejorado
+    selectedChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.darkOliveGreen,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 20,
+        marginRight: 8,
+        elevation: 2,
+        shadowColor: colors.darkOliveGreen,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3,
+    },
+    selectedChipText: {
+        color: colors.white,
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    // Botón diagnosticar burbuja
+    diagnoseBtnBubble: {
+        position: 'absolute',
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        right: -20,
+        top: -30,
     },
 
     // Stepper
@@ -570,11 +751,11 @@ const styles = StyleSheet.create({
         backgroundColor: colors.white,
         borderRadius: 16,
         padding: 16,
-        elevation: 1,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 3,
+        elevation: 2,
+        shadowColor: colors.kombuGreen,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
     },
     stepItem: {
         alignItems: 'center',
@@ -587,9 +768,9 @@ const styles = StyleSheet.create({
         opacity: 1,
     },
     stepCircle: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 38,
+        height: 38,
+        borderRadius: 19,
         backgroundColor: colors.gray,
         justifyContent: 'center',
         alignItems: 'center',
@@ -597,6 +778,11 @@ const styles = StyleSheet.create({
     },
     stepCircleActive: {
         backgroundColor: colors.darkOliveGreen,
+        elevation: 3,
+        shadowColor: colors.darkOliveGreen,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
     },
     stepLabel: {
         fontSize: 11,
@@ -613,6 +799,7 @@ const styles = StyleSheet.create({
         backgroundColor: colors.gray,
         marginHorizontal: 10,
         marginBottom: 18,
+        borderRadius: 1,
     },
     stepLineActive: {
         backgroundColor: colors.darkOliveGreen,
@@ -627,11 +814,15 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '700',
         color: colors.kombuGreen,
+        paddingLeft: 10,
+        borderLeftWidth: 3,
+        borderLeftColor: colors.darkOliveGreen,
     },
     stepDesc: {
         fontSize: 14,
         color: colors.darkGray,
-        marginTop: 4,
+        marginTop: 6,
+        marginLeft: 13,
     },
 
     // Search box
@@ -643,11 +834,11 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 10,
         marginBottom: 16,
-        elevation: 1,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 3,
+        elevation: 2,
+        shadowColor: colors.kombuGreen,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
     },
     searchInput: {
         flex: 1,
@@ -669,11 +860,13 @@ const styles = StyleSheet.create({
         padding: 14,
         borderRadius: 14,
         marginBottom: 8,
-        elevation: 1,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 2,
+        elevation: 2,
+        shadowColor: colors.kombuGreen,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+        borderLeftWidth: 3,
+        borderLeftColor: colors.darkOliveGreen + '40',
     },
     patientCardDesktop: {
         width: '48%',
@@ -708,11 +901,13 @@ const styles = StyleSheet.create({
     patientBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.darkOliveGreen + '10',
+        backgroundColor: colors.darkOliveGreen + '15',
         paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 10,
+        paddingVertical: 10,
+        borderRadius: 12,
         marginBottom: 16,
+        borderLeftWidth: 3,
+        borderLeftColor: colors.darkOliveGreen,
     },
     patientBadgeText: {
         flex: 1,
@@ -823,11 +1018,13 @@ const styles = StyleSheet.create({
         padding: 30,
         alignItems: 'center',
         width: 280,
-        elevation: 4,
-        shadowColor: '#000',
+        elevation: 6,
+        shadowColor: colors.kombuGreen,
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.12,
-        shadowRadius: 8,
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+        borderTopWidth: 3,
+        borderTopColor: colors.darkOliveGreen,
     },
     loadingTitle: {
         fontSize: 16,
@@ -863,11 +1060,13 @@ const styles = StyleSheet.create({
         padding: 24,
         marginBottom: 16,
         alignItems: 'center',
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 6,
+        elevation: 3,
+        shadowColor: colors.kombuGreen,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.12,
+        shadowRadius: 8,
+        borderTopWidth: 4,
+        borderTopColor: colors.darkOliveGreen,
     },
     resultIcon: {
         marginBottom: 12,
@@ -1032,6 +1231,8 @@ const styles = StyleSheet.create({
 
     // Urgencia y especialista
     urgenciaCard: {
+        borderLeftWidth: 4,
+        borderLeftColor: colors.fawn,
         backgroundColor: colors.white,
         borderRadius: 16,
         padding: 16,
@@ -1072,6 +1273,7 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     accionNum: {
+        backgroundColor: colors.darkOliveGreen,
         width: 24,
         height: 24,
         borderRadius: 12,

@@ -4,19 +4,37 @@
  * acciones rápidas (historial, diagnóstico IA) y edición.
  * Diseño responsive con maxWidth en desktop.
  */
-import React, { useEffect, useState } from 'react';
-import { View, ScrollView, StyleSheet, Alert, useWindowDimensions } from 'react-native';
+import React, { useEffect, useState, useRef, useContext } from 'react';
+import { View, ScrollView, StyleSheet, Alert, useWindowDimensions, Animated, TouchableOpacity } from 'react-native';
 import {
     Text, Button, Surface, Divider, IconButton, ActivityIndicator
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
+import { useToast } from '../components/ToastContext';
 import PacientesService from '../services/PacientesService';
+import { DesktopNavContext } from '../navigation/MainNavigator';
 
 const DetallePacienteScreen = ({ route, navigation }) => {
     const { pacienteId } = route.params;
     const { width } = useWindowDimensions();
     const isDesktop = width > 768;
+    const { showToast } = useToast();
+    const { navigateToTab } = useContext(DesktopNavContext);
+
+    const goTo = (tab) => {
+        if (isDesktop) {
+            navigateToTab(tab, { pacienteId });
+        } else {
+            navigation.navigate(tab, { pacienteId });
+        }
+    };
+
+    // ── Animación de entrada: fade ──
+    const _fadeAnim = useRef(new Animated.Value(0)).current;
+    useEffect(() => {
+        Animated.timing(_fadeAnim, { toValue: 1, duration: 350, useNativeDriver: false }).start();
+    }, []);
 
     const [paciente, setPaciente] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -31,7 +49,7 @@ const DetallePacienteScreen = ({ route, navigation }) => {
             const data = await PacientesService.getPaciente(pacienteId);
             setPaciente(data);
         } catch (error) {
-            Alert.alert('Error', 'No se pudo cargar la información del paciente.');
+            showToast('No se pudo cargar la información del paciente.', 'error');
             navigation.goBack();
         } finally {
             setLoading(false);
@@ -51,10 +69,10 @@ const DetallePacienteScreen = ({ route, navigation }) => {
                     onPress: async () => {
                         try {
                             await PacientesService.deletePaciente(pacienteId);
-                            Alert.alert('Eliminado', 'El paciente ha sido eliminado.');
+                            showToast('Paciente eliminado correctamente.', 'success');
                             navigation.goBack();
                         } catch (error) {
-                            Alert.alert('Error', 'No se pudo eliminar el paciente.');
+                            showToast('No se pudo eliminar el paciente.', 'error');
                         }
                     }
                 },
@@ -73,8 +91,15 @@ const DetallePacienteScreen = ({ route, navigation }) => {
     if (!paciente) return null;
 
     return (
-        <ScrollView style={styles.container}>
+        <Animated.View style={[styles.container, { opacity: _fadeAnim }]}>
+        <ScrollView style={{ flex: 1 }}>
             <View style={[styles.content, isDesktop && styles.contentDesktop]}>
+                {/* Flecha de regreso */}
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+                    <MaterialCommunityIcons name="arrow-left" size={22} color={colors.kombuGreen} />
+                    <Text style={styles.backLabel}>Pacientes</Text>
+                </TouchableOpacity>
+
                 {/* Avatar + Nombre */}
                 <View style={styles.profileSection}>
                     <View style={[styles.avatar, { backgroundColor: paciente.sexo === 'F' ? colors.fawn + '25' : colors.darkOliveGreen + '18' }]}>
@@ -112,13 +137,13 @@ const DetallePacienteScreen = ({ route, navigation }) => {
                         icon="clipboard-text-clock"
                         label="Historial Clínico"
                         color={colors.darkOliveGreen}
-                        onPress={() => navigation.navigate('Historial', { pacienteId: paciente.id })}
+                        onPress={() => goTo('Historial')}
                     />
                     <ActionCard
                         icon="brain"
                         label="Diagnóstico IA"
                         color={colors.liver}
-                        onPress={() => navigation.navigate('Diagnostico', { pacienteId: paciente.id })}
+                        onPress={() => goTo('Diagnostico')}
                     />
                 </View>
 
@@ -134,6 +159,7 @@ const DetallePacienteScreen = ({ route, navigation }) => {
                 </Button>
             </View>
         </ScrollView>
+        </Animated.View>
     );
 };
 
@@ -212,6 +238,20 @@ const styles = StyleSheet.create({
     content: {
         padding: 16,
         paddingBottom: 40,
+    },
+    backBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+        alignSelf: 'flex-start',
+        paddingVertical: 4,
+        paddingHorizontal: 2,
+    },
+    backLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: colors.kombuGreen,
+        marginLeft: 6,
     },
     contentDesktop: {
         maxWidth: 650,
