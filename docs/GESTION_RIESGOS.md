@@ -39,6 +39,8 @@ Cada riesgo se evalúa con:
 | RT-03 | **Modelo IA con baja precisión en datos reales** — El modelo entrenado con datos generados no funciona bien con pacientes reales | 2 | 2 | 🟡 4 | El modelo es herramienta de apoyo, no diagnóstico final. Reentrenar con dataset de Kaggle real cuando esté disponible |
 | RT-04 | **Dependencias de npm/pip desactualizadas** — Breaking changes en paquetes | 1 | 2 | 🟢 2 | Versiones fijadas en `package.json` y `requirements.txt` |
 | RT-05 | **Pérdida de datos en migración** — Datos perdidos al cambiar de SQLite a SQL Server | 1 | 3 | 🟡 3 | Script `seed_data.py` permite regenerar datos demo en cualquier momento |
+| RT-06 | **Bloqueo del puerto de desarrollo (Expo)** — El puerto 8081 se queda "zombie" o el CLI de Expo falla por timeout de red | 3 | 2 | 🔴 6 | Uso de bandera `--offline` para el CLI y configuración explicita de puertos alternos (8082). Script para matar procesos Node zombie |
+| RT-07 | **Desconexión API_URL estática** — Cambios en la IP local rompen peticiones frontend/backend | 2 | 3 | 🔴 6 | Implementar `localhost` para pruebas web en el mismo host y `.env` para producción. |
 
 ### 3.2 Riesgos de Seguridad
 
